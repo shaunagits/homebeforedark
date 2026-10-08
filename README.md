@@ -13,5 +13,6 @@ Play it at https://games.shauna.digital/homebeforedark/
 ## Things to know
 
 - Music is a loop built into the code. To use an audio track instead, add a file named `music.mp3` next to `index.html`.
+- Sound effects (bike wheel whir, streetlight hum, flicker crackle, lane swish, monster leap, crash) are currently switched off so only the music plays. `SFX_VOLUME` at the top of the sound section turns them back on.
 - Best score and mute setting are saved in the browser per web address, so scores saved at the `vercel.app` address do not appear on games.shauna.digital.
 - Tuning knobs (speed, spacing, spawn distances) are at the top of the script in `index.html`.

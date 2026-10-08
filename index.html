@@ -195,7 +195,7 @@ function ctext(s,y,sc,col,al){let n=-1;for(const ch of s)n+=(FONT[ch]?FONT[ch].l
 
 /* ---------- sound ---------- */
 const MUSIC_FILE='music.mp3';   // drop a file with this name next to index.html and it loops in the background
-const SFX_VOLUME=1, MUSIC_VOLUME=0.5;   // set SFX_VOLUME to 0 to play with music only
+const SFX_VOLUME=0, MUSIC_VOLUME=0.5;   // sound effects are off for now (music only); set SFX_VOLUME to 1 to bring back the wheel whir, streetlight hum and event sounds
 let sfxG=null,musicG=null,synthTimer=null,seqT=0,seqStep=0,arpF=null;
 let ac=null,master=null,muted=false,noiseBuf=null,whirG=null,whirF=null,buzzG=null,music=null,clickT=0;
 try{muted=localStorage.getItem('homebeforedark-muted')==='1';}catch(e){}
