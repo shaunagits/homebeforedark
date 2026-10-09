@@ -10,6 +10,14 @@ Play it at https://games.shauna.digital/homebeforedark/
 - Hosting: Vercel project `homebeforedark` (team `shaunagits-projects`), deployed automatically from the `main` branch.
 - The games site (`shaunagits/games`) forwards `games.shauna.digital/homebeforedark/` to this project, so all paths inside the game must stay relative.
 
+## How a ride works
+
+- One road home: half a mile (`HOME_FT`). The corner shows how far is left.
+- Mom's porch light glows at the end of the road from the start; the house comes into view near the end.
+- The ride starts at dusk and gets darker the closer you get. Streetlights die more often near home (`DEAD_MIN`, `DEAD_MAX`); a dead light only sputters when something is coming.
+- Some flickers are false alarms (`FAKE_CHANCE`). The last stretch to the house is quiet.
+- Crash and you start over from the beginning. The game remembers your closest finish and, once you make it home, your best time.
+
 ## Things to know
 
 - Music is a loop built into the code. To use an audio track instead, add a file named `music.mp3` next to `index.html`.
