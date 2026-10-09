@@ -771,6 +771,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+/* test hooks for automated playtests (see _docs/findings): read state, skip ahead (warp), clear creatures, or jump to a set distance from home (remain) */
 window.__nr={get state(){return state;},get dieT(){return dieT;},get mons(){return mons;},get lane(){return lane;},get paused(){return paused;},warp(ft){startFt-=ft;},clear(){mons=[];},remain(ft){startFt=dist*FT_PER_UNIT+ft-HOME_FT;mons=[];}};
 })();
 </script>
