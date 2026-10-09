@@ -196,7 +196,7 @@ const fallen=(()=>{
 
 /* ---------- tiny pixel font ---------- */
 const FONT={A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',K:'101101110101101',L:'100100100100111',M:'1000111011101011000110001',N:'10011101101110011001',O:'010101101101010',P:'110101110100100',Q:'010101101110011',R:'110101110101101',S:'011100010001110',T:'111010010010010',U:'101101101101111',V:'101101101101010',W:'1000110001101011101110001',X:'101101010101101',Y:'101101010010010',Z:'111001010100111',
-0:'111101101101111',1:'010110010010111',2:'110001010100111',3:'110001010001110',4:'101101111001001',5:'111100110001110',6:'011100111101111',7:'111001010010010',8:'111101111101111',9:'111101111001110','.':'000000000000010',':':'000010000010000','-':'000000111000000','/':'001001010100100'};
+0:'111101101101111',1:'010110010010111',2:'110001010100111',3:'110001010001110',4:'101101111001001',5:'111100110001110',6:'011100111101111',7:'111001010010010',8:'111101111101111',9:'111101111001110','.':'000000000000010','<':'001010100010001',':':'000010000010000','-':'000000111000000','/':'001001010100100'};
 function text(s,x,y,sc,col,al){
   ctx.globalAlpha=al==null?1:al;ctx.fillStyle=col;
   for(const ch of s){const g=FONT[ch],w=g?g.length/5:3;if(g)for(let i=0;i<g.length;i++)if(g[i]==='1')ctx.fillRect(x+(i%w)*sc,y+((i/w)|0)*sc,sc,sc);x+=(w+1)*sc;}
@@ -361,6 +361,10 @@ function setPaused(p){
   if(ac){(p?ac.suspend():ac.resume()).catch(()=>{});}
   if(music){if(p)music.pause();else music.play().catch(()=>{});}
 }
+/* back to the games page; when the game is opened on its own vercel.app address, go to the games site instead */
+const GAMES_URL=location.hostname==='games.shauna.digital'?'/':'https://games.shauna.digital/';
+function toGames(){location.href=GAMES_URL;}
+function backShown(){return state==='title'||(state==='dying'&&dieT>(crashes>1?T_QUICK:T_AGAIN))||(state==='home'&&homeT>E_AGAIN);}
 function quit(){
   if(ac)ac.resume().catch(()=>{});
   if(music&&music.paused)music.play().catch(()=>{});
@@ -699,7 +703,7 @@ function render(){
     if(bestTime)ctext('BEST TIME '+fmtTime(bestTime),ty+42+o,1,ink,0.7);
     else if(closest)ctext('CLOSEST '+closest+' FT FROM HOME',ty+42+o,1,ink,0.7);
     else ctext('HALF A MILE HOME',ty+42+o,1,ink,0.7);
-    if(!narrow)ctext('P PAUSE   M MUTE',H-9,1,ink,0.35);
+    if(!narrow)ctext('P PAUSE   M MUTE   ESC GAMES',H-9,1,ink,0.35);
   }else if(state==='play'){
     text('HOME '+Math.max(0,Math.ceil(HOME_FT-rodeFt()))+' FT',4,4,1,ink,0.8);
     if(playT<2.5&&!paused)ctext('WATCH THE LIGHTS',HZ-14,1,ink,Math.min(1,(2.5-playT)));
@@ -728,7 +732,9 @@ function render(){
     ctext('PAUSED',py,2,red);
     ctext('RESUME',py+28,1,ink,blink?1:0.75);
     ctext('QUIT',py+46,1,ink,0.75);
+    ctext('ALL GAMES',py+64,1,ink,0.75);
   }
+  if(backShown()&&!paused)text('< GAMES',4,5,1,ink,0.7);
   drawMute();
 }
 
@@ -739,7 +745,8 @@ addEventListener('keydown',e=>{
   else if(k==='ArrowRight'||k==='d'||k==='D'){e.preventDefault();if(!e.repeat)steer(1);}
   else if(k===' '||k==='Enter'){e.preventDefault();if(e.repeat)return;if(paused)setPaused(false);else steer(0);}
   else if(k==='m'||k==='M'){setMute(!muted);}
-  else if(k==='p'||k==='P'||k==='Escape'){e.preventDefault();if(state==='play')setPaused(!paused);}
+  else if(k==='p'||k==='P'||k==='Escape'){e.preventDefault();if(state==='play')setPaused(!paused);else if(k==='Escape'&&backShown())toGames();}
+  else if((k==='g'||k==='G')&&(paused||backShown())){toGames();}
   else if((k==='q'||k==='Q')&&paused){quit();}
 });
 let pDown=null;
@@ -747,11 +754,13 @@ stage.addEventListener('pointerdown',e=>{
   e.preventDefault();cv.focus();
   const r=cv.getBoundingClientRect(),gx=(e.clientX-r.left)/r.width*W,gy=(e.clientY-r.top)/r.height*H;
   if(gx>W-21&&gx<=W&&gy>=0&&gy<22){audio();setMute(!muted);pDown=null;return;}
+  if(backShown()&&!paused&&gx<44&&gy>=0&&gy<20){toGames();pDown=null;return;}
   if(state==='play'&&!paused&&gx>W-44&&gx<=W-21&&gy>=0&&gy<22){setPaused(true);pDown=null;return;}
   if(paused){
     const py=Math.round(H*0.3);
     if(Math.abs(gx-CX)<44&&gy>=py+22&&gy<py+39)setPaused(false);
     else if(Math.abs(gx-CX)<44&&gy>=py+39&&gy<py+58)quit();
+    else if(Math.abs(gx-CX)<44&&gy>=py+58&&gy<py+76)toGames();
     pDown=null;return;
   }
   pDown=null;steer(gx<W/2?-1:1);   // steer the moment a finger touches a side

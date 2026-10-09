@@ -20,7 +20,7 @@ Play it at https://games.shauna.digital/homebeforedark/
 - A shadow on the road shows where a leaping creature will land.
 - Crash and you start over from the beginning. After the first crash of a visit, a tap can skip ahead after `T_QUICK` seconds. Your dropped backpack marks your closest finish on later rides.
 - Reaching home plays the ending: he hops off, the bike tips over, he goes inside, the streetlights and porch light go out with eyes in the trees, and the screen goes dark (timings `E_OFF` to `E_AGAIN`).
-- Controls: left and right arrows or A and D; on touch, tap the left or right half to move to that lane (steers on touch down). P or Esc pauses, M mutes.
+- Controls: left and right arrows or A and D; on touch, tap the left or right half to move to that lane (steers on touch down). P or Esc pauses, M mutes. "< GAMES" (top left on the title, crash and ending screens), Esc on those screens, or ALL GAMES in the pause menu goes back to games.shauna.digital. It is hidden while riding so a steering tap cannot leave the game.
 
 ## Things to know
 
