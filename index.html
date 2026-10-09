@@ -30,12 +30,13 @@ const stage=document.getElementById('stage'),cv=document.getElementById('g'),ctx
 
 /* ---------- tuning knobs (easy to tweak) ---------- */
 const RW=80;          // half road width in pixels at the rider
-const LANE=50;        // distance between lane centers
+const LANE=40;        // two lanes: each lane center is this far from the middle of the road
 const LAMP_D=4.5;       // streetlight spacing (world units)
 const DASH=1.2;       // center dash spacing
 const START_SPEED=2.8, MAX_SPEED=7.2;   // speed at the start of the ride and near home (it ramps up by distance)
 const SPAWN_Z=11, LEAP_Z=5.6, LAND_Z=3.9;   // monster appears, starts its jump, lands
-const LATE_LEAP=0.8;   // near the end it jumps this much later, so reading the lights matters more than reacting
+const LATE_LEAP=0.8;
+const PAIR_FROM=0.15, PAIR_MAX=0.5, PAIR_GAP=0.55;   // back-to-back pairs start after this much of the ride, up to this chance, this many seconds apart (a bit less near the end)   // near the end it jumps this much later, so reading the lights matters more than reacting
 const FT_PER_UNIT=8;
 const HOME_FT=2640;   // distance home, in feet (half a mile)
 const DEAD_MIN=0.04, DEAD_MAX=0.5;   // chance a streetlight is dead, near the start and near home
@@ -314,7 +315,7 @@ function lampLevel(k,si){
 }
 
 function start(){
-  state='play';v=START_SPEED;lane=0;riderX=0;mons=[];dodged=0;playT=0;dieT=0;newBest=false;fell=false;killer=null;
+  state='play';v=START_SPEED;lane=1;riderX=LANE;mons=[];dodged=0;playT=0;dieT=0;newBest=false;fell=false;killer=null;
   headOn=1;amb=0.1;outZ=99;nextSpawn=dist+5;homeT=0;rideSpawns=0;hintT=0;porchLv=1;winLv=1;doorOpen=0;
 }
 const ease=()=>{const q=Math.min(1,prog()/0.85);return q*q*(3-2*q);};
@@ -331,14 +332,14 @@ function spawn(){
   if(busy[si])si=1-si;
   if(busy[si]){rideSpawns--;return 1;}
   if(rideSpawns>3&&Math.random()<FAKE_CHANCE+0.1*p){mons.push({fake:true,z:SPAWN_Z,si,lz,ldz});return 0;}   // false alarm
-  /* the flicker side tells you where it lands: its own side's lane, or the middle */
-  const mid=0.25+0.25*p,aim=s=>Math.random()<mid?0:(s?1:-1);
-  const a={z:SPAWN_Z,lz,ldz,si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:aim(si),passed:false};a.x=a.x0;
+  /* two lanes: the flicker side is the lane it lands in */
+  const a={z:SPAWN_Z,lz,ldz,si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:si?1:-1,passed:false};a.x=a.x0;
   mons.push(a);
   const s2=1-si;
-  if(rideSpawns>3&&!busy[s2]&&p>0.3&&Math.random()<Math.min(0.4,(p-0.3)*0.8)){
-    const b={z:SPAWN_Z+0.25,lz,ldz,si:s2,x0:(s2?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:aim(s2),passed:false};b.x=b.x0;
-    if(b.tl0===a.tl0)b.tl0=s2?1:-1;
+  /* a pair: one from each side, one after the other, so you dodge the first into the second's lane and have to switch back in time */
+  if(rideSpawns>3&&!busy[s2]&&p>PAIR_FROM&&Math.random()<Math.min(PAIR_MAX,(p-PAIR_FROM)*1.2)){
+    const gap=v*(PAIR_GAP-0.15*ease())+0.3;   // seconds between the two, turned into road distance
+    const b={z:SPAWN_Z+gap,lz,ldz,si:s2,x0:(s2?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:s2?1:-1,passed:false};b.x=b.x0;
     mons.push(b);
   }
   return 0;
@@ -371,7 +372,7 @@ function steer(d){
   if(state==='title'){startFt=dist*FT_PER_UNIT;start();return;}
   if(state==='dying'){if(dieT>(crashes>1?T_QUICK:T_AGAIN)){startFt=dist*FT_PER_UNIT;start();}return;}
   if(state==='home'){if(homeT>E_AGAIN){startFt=dist*FT_PER_UNIT;start();}return;}
-  if(d){const nl=Math.max(-1,Math.min(1,lane+d));if(nl!==lane){lane=nl;noise(0.09,0.05,500,1200,1.5);}}
+  if(d){const nl=d<0?-1:1;if(nl!==lane){lane=nl;noise(0.09,0.05,500,1200,1.5);}}
 }
 
 function update(dt){

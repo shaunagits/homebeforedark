@@ -1,12 +1,12 @@
 # Project status
 
-Last updated 2026-10-08. Live at https://games.shauna.digital/homebeforedark/ (deploys from `main`).
+Last updated 2026-10-08 (two lanes). Live at https://games.shauna.digital/homebeforedark/ (deploys from `main`).
 
 ## Current state
 
 - One road home, half a mile (`HOME_FT=2640`), about 68 seconds at speed. Countdown in the corner.
 - Dusk to dark over the ride; streetlights die more often near home; dead lights sputter only when something is coming.
-- The flicker side tells you where a creature lands (its side lane or the middle). Late in the ride creatures jump later (`LATE_LEAP`).
+- Two lanes. The flicker side is the lane a creature lands in. Back-to-back pairs from both sides from about 15% of the ride. Late in the ride creatures jump later (`LATE_LEAP`).
 - Difficulty is driven by distance, with two breathers (`BREATHERS`) and a quiet last 260 ft. First two creatures of each ride are scripted (one per side, no false alarms yet).
 - Landing shadow, treeline and roadside trunks, porch light that grows, backpack marker at your closest finish.
 - Crash: headline "N FT FROM HOME", restart from the beginning; quick retry after the first crash of a visit.
@@ -30,3 +30,4 @@ Last updated 2026-10-08. Live at https://games.shauna.digital/homebeforedark/ (d
 | Creature design | Keep the existing petal-headed creature | Shauna's choice. Flagged: it closely resembles a well-known TV monster, which conflicts with the original-artwork rule. An original antlered design with cold white eyes was mocked up and is available | 2026-10-08 |
 | Creature eye color | Keep cream, not red | Red is the boy's vest and the UI color; dark red vanishes at night (design review) | 2026-10-08 |
 | Ending monsters | Shown only as pairs of eyes in the trees | Avoids drawing more of the creature; reads well in the dark | 2026-10-08 |
+| Number of lanes | Two lanes instead of three; landing lane always matches the flicker side; staggered pairs from both sides add the challenge | Shauna found three lanes too easy. Bot check: react-only bots at 0.4 s now get caught near the end (they made it home with three lanes); bots that read the lights mostly make it. Supersedes the "its side lane or the middle" rule above | 2026-10-08 |

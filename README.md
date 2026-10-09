@@ -15,12 +15,12 @@ Play it at https://games.shauna.digital/homebeforedark/
 - One road home through the woods: half a mile (`HOME_FT`). The corner shows how far is left.
 - Mom's porch light glows at the end of the road from the start and grows as you get closer; the house comes into view near the end.
 - The ride starts at dusk and gets darker the closer you get. Streetlights die more often near home (`DEAD_MIN`, `DEAD_MAX`); a dead light only sputters when something is coming.
-- The flicker tells you where: a creature from the left lands in the left or middle lane, one from the right in the right or middle lane. Near the end creatures jump later (`LATE_LEAP`), so reading the lights matters more than reacting.
+- Two lanes, one on each side of the center line (`LANE`). The flicker tells you where: a creature from the left lands in the left lane, one from the right in the right lane. From about 15% of the ride, back-to-back pairs come from both sides (`PAIR_FROM`, `PAIR_MAX`, `PAIR_GAP`), so you dodge the first into the second's lane and must switch back in time. Near the end creatures jump later (`LATE_LEAP`), so reading the lights matters more than reacting.
 - Difficulty follows distance, not dodges: speed (`START_SPEED`, `MAX_SPEED`) and spacing ramp up, with quiet stretches (`BREATHERS`) and a quiet last stretch to the house. The first two creatures of every ride come one from each side, and false alarms (`FAKE_CHANCE`) start after that.
 - A shadow on the road shows where a leaping creature will land.
 - Crash and you start over from the beginning. After the first crash of a visit, a tap can skip ahead after `T_QUICK` seconds. Your dropped backpack marks your closest finish on later rides.
 - Reaching home plays the ending: he hops off, the bike tips over, he goes inside, the streetlights and porch light go out with eyes in the trees, and the screen goes dark (timings `E_OFF` to `E_AGAIN`).
-- Controls: left and right arrows or A and D; on touch, tap the left or right half (steers on touch down). P or Esc pauses, M mutes.
+- Controls: left and right arrows or A and D; on touch, tap the left or right half to move to that lane (steers on touch down). P or Esc pauses, M mutes.
 
 ## Things to know
 
