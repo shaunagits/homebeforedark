@@ -33,12 +33,15 @@ const RW=80;          // half road width in pixels at the rider
 const LANE=50;        // distance between lane centers
 const LAMP_D=4.5;       // streetlight spacing (world units)
 const DASH=1.2;       // center dash spacing
-const START_SPEED=2.8, MAX_SPEED=7.5, SPEED_PER_DODGE=0.2, SPEED_PER_SEC=0.015;
+const START_SPEED=2.8, MAX_SPEED=7.2;   // speed at the start of the ride and near home (it ramps up by distance)
 const SPAWN_Z=11, LEAP_Z=5.6, LAND_Z=3.9;   // monster appears, starts its jump, lands
+const LATE_LEAP=0.8;   // near the end it jumps this much later, so reading the lights matters more than reacting
 const FT_PER_UNIT=8;
 const HOME_FT=2640;   // distance home, in feet (half a mile)
 const DEAD_MIN=0.04, DEAD_MAX=0.5;   // chance a streetlight is dead, near the start and near home
-const FAKE_CHANCE=0.2;   // chance a flicker is a false alarm (nothing comes); rises a little closer to home
+const FAKE_CHANCE=0.2;
+const BREATHERS=[[0.40,0.46],[0.66,0.70]];   // quiet stretches (fraction of the ride) where nothing comes
+const T_QUICK=1.3;   // after the first crash, how soon a tap can skip to a new ride   // chance a flicker is a false alarm (nothing comes); rises a little closer to home
 
 /* ---------- sizing ---------- */
 let W=320,H=240,HZ=86,YR=214,K=128,CX=160,img,buf,stars=[];
@@ -53,6 +56,7 @@ function resize(){
   img=ctx.createImageData(W,H);buf=new Uint32Array(img.data.buffer);
   ctx.imageSmoothingEnabled=false;
   let s=7;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+  makeTreeline();
   stars=[];for(let i=0;i<28;i++)stars.push([Math.floor(rnd()*W),Math.floor(rnd()*(HZ-6)),0.2+rnd()*0.5]);
 }
 
@@ -104,6 +108,9 @@ const BODYP=plaid(BODY);
 const riderA=spr(BODYP.concat(LEGS),RP),riderB=spr(BODYP.concat(LEGS.map(rev)),RP);
 const bikeOnly=spr(BODY.concat(LEGS),RP,'kgbo');
 const RH=BODY.length+LEGS.length;
+const BOYTOP=BODYP.slice(0,17).map(r=>r.replace(/g/g,'.'));
+const boyA=spr(BOYTOP.concat(["......jjjjjjjj......","......jjj..jjj......","......jjj..jjj......","......jj....jj......","......ww....ww......"]),RP),boyB=spr(BOYTOP.concat(["......jjjjjjjj......","......jjj..jjj......","......jj...jjj......","......jj...jj.......",".......ww..ww......."]),RP),BH=22;
+const pack=spr([".bbbbb.","bBBBBBb","bBbbbBb","bBBBBBb","bBBkBBb","bBBBBBb",".bbbbb."],{b:'#22345c',B:'#34508a',k:'#c98a3a'});
 
 const MP={m:'#54475e',n:'#2e2536',l:'#7a6c80',e:'#e4f8ff',x:'#8a1019',t:'#e8e0c8',c:'#d4caa8'};
 const HEAD_OPEN=[
@@ -244,7 +251,7 @@ function startSynth(){
       try{
         const o=ac.createOscillator(),g=ac.createGain();o.type='sawtooth';o.frequency.value=mhz(root+12+off);
         g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.09,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+STEP*1.9);
-        arpF.frequency.setValueAtTime(800+500*Math.sin(seqStep/64*Math.PI*2),t);
+        arpF.frequency.setValueAtTime((800+500*Math.sin(seqStep/64*Math.PI*2))*(warn[0]||warn[1]?0.55:1),t);   // a little muffled while a light flickers
         o.connect(g);g.connect(arpF);o.start(t);o.stop(t+STEP*2);
         if(i===0){
           const b=ac.createOscillator(),bg=ac.createGain();b.type='triangle';b.frequency.value=mhz(root);
@@ -283,10 +290,13 @@ function noise(d,vol,f1,f2,q){
 /* ---------- state ---------- */
 let state='title',dist=0,v=1.6,lane=0,riderX=0,mons=[],nextSpawn=0,dodged=0,playT=0,dieT=0,best=0,newBest=false;
 let headOn=1,amb=0.06,outZ=99,sideVal=[0.5,0.5],warn=[false,false],flickT=0,pedal=0,lastTick=0,fell=false,killer=null,fallDir=1;
+let crashes=0,sessionDodged=false,hintT=0,rideSpawns=0;
 let startFt=0,finalFt=0,paused=false,homeT=0,winTime=0,bestTime=0,closest=0,newRecord=false;
 const T_GRAB=0.55,T_DARK=0.85,T_TILT=1.1,T_FELL=1.5,T_OUT=2.3,T_HFLICK=4.1,T_HOFF=4.5,T_END=5.0,T_AGAIN=6.1;
 try{bestTime=+(localStorage.getItem('homebeforedark-time')||0)||0;closest=+(localStorage.getItem('homebeforedark-closest')||0)||0;}catch(e){}
-const T_HOME_TEXT=1.6,T_HOME_TIME=2.6,T_HOME_AGAIN=3.6;
+/* ending timeline (seconds after reaching the house) */
+const E_OFF=2.2,E_TIP=2.7,E_WALK=2.9,E_DOOR=4.6,E_IN=5.0,E_SHUT=5.4,E_EYES=5.9,E_LAMPS=6.8,E_PORCH=7.4,E_WIN=8.0,E_DARK=8.8,E_THEEND=9.3,E_TIME=10.2,E_AGAIN=11.0;
+let porchLv=1,winLv=1,doorOpen=0;
 const riding=()=>state==='play'||state==='dying'||state==='home';
 const rodeFt=()=>dist*FT_PER_UNIT-startFt;
 function prog(){return riding()?Math.max(0,Math.min(1,rodeFt()/HOME_FT)):0;}
@@ -305,22 +315,37 @@ function lampLevel(k,si){
 
 function start(){
   state='play';v=START_SPEED;lane=0;riderX=0;mons=[];dodged=0;playT=0;dieT=0;newBest=false;fell=false;killer=null;
-  headOn=1;amb=0.1;outZ=99;nextSpawn=dist+5;homeT=0;
+  headOn=1;amb=0.1;outZ=99;nextSpawn=dist+5;homeT=0;rideSpawns=0;hintT=0;porchLv=1;winLv=1;doorOpen=0;
 }
+const ease=()=>{const q=Math.min(1,prog()/0.85);return q*q*(3-2*q);};
+function spawnGap(){const e=ease();return 7-3.6*e+Math.random()*(3-1.2*e);}
+/* returns a short retry gap when it could not place a creature yet */
 function spawn(){
-  if(HOME_FT-rodeFt()<260)return;   // the last stretch to the house is quiet
-  if(Math.random()<FAKE_CHANCE+0.1*prog()){mons.push({fake:true,z:SPAWN_Z,si:Math.random()<0.5?0:1});return;}   // false alarm
-  const si=Math.random()<0.5?0:1,pair=dodged>=4&&Math.random()<Math.min(0.45,0.15+dodged*0.015);
-  const a={z:SPAWN_Z,si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,partner:null,passed:false};a.x=a.x0;
+  const p=prog();
+  if(HOME_FT-rodeFt()<260)return 0;   // the last stretch to the house is quiet
+  for(const b of BREATHERS)if(p>b[0]&&p<b[1])return 0;
+  const busy=[0,1].map(si=>mons.some(m=>m.si===si&&m.z>m.ldz));
+  const lz=LEAP_Z-LATE_LEAP*ease(),ldz=lz-(LEAP_Z-LAND_Z);   // keep warnings on one side from merging
+  rideSpawns++;
+  let si=rideSpawns===1?0:rideSpawns===2?1:(Math.random()<0.5?0:1);   // first two: one from each side
+  if(busy[si])si=1-si;
+  if(busy[si]){rideSpawns--;return 1;}
+  if(rideSpawns>3&&Math.random()<FAKE_CHANCE+0.1*p){mons.push({fake:true,z:SPAWN_Z,si,lz,ldz});return 0;}   // false alarm
+  /* the flicker side tells you where it lands: its own side's lane, or the middle */
+  const mid=0.25+0.25*p,aim=s=>Math.random()<mid?0:(s?1:-1);
+  const a={z:SPAWN_Z,lz,ldz,si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:aim(si),passed:false};a.x=a.x0;
   mons.push(a);
-  if(pair){const s2=1-si,b={z:SPAWN_Z+0.25,si:s2,x0:(s2?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,partner:a,passed:false};b.x=b.x0;mons.push(b);}
+  const s2=1-si;
+  if(rideSpawns>3&&!busy[s2]&&p>0.3&&Math.random()<Math.min(0.4,(p-0.3)*0.8)){
+    const b={z:SPAWN_Z+0.25,lz,ldz,si:s2,x0:(s2?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:aim(s2),passed:false};b.x=b.x0;
+    if(b.tl0===a.tl0)b.tl0=s2?1:-1;
+    mons.push(b);
+  }
+  return 0;
 }
-function pickLane(m){
-  if(m.partner&&m.partner.tl!=null){const o=[-1,0,1].filter(l=>l!==m.partner.tl);return o[Math.random()<0.5?0:1];}
-  return Math.random()<0.9?lane:Math.floor(Math.random()*3)-1;
-}
+function pickLane(m){return m.tl0;}
 function die(m){
-  state='dying';dieT=0;v=0;lastTick=0;killer=m;fallDir=m.si?-1:1;
+  state='dying';dieT=0;v=0;lastTick=0;killer=m;fallDir=m.si?-1:1;crashes++;
   finalFt=Math.max(1,Math.ceil(HOME_FT-rodeFt()));newBest=false;
   if(!closest||finalFt<closest){closest=finalFt;newBest=true;try{localStorage.setItem('homebeforedark-closest',String(closest));}catch(e){}}
   noise(0.6,0.16,900,3200,3);beep(70,0.7,'sawtooth',0.14,40);
@@ -344,8 +369,8 @@ function steer(d){
   if(paused)return;
   audio();
   if(state==='title'){startFt=dist*FT_PER_UNIT;start();return;}
-  if(state==='dying'){if(dieT>T_AGAIN){startFt=dist*FT_PER_UNIT;start();}return;}
-  if(state==='home'){if(homeT>T_HOME_AGAIN){startFt=dist*FT_PER_UNIT;start();}return;}
+  if(state==='dying'){if(dieT>(crashes>1?T_QUICK:T_AGAIN)){startFt=dist*FT_PER_UNIT;start();}return;}
+  if(state==='home'){if(homeT>E_AGAIN){startFt=dist*FT_PER_UNIT;start();}return;}
   if(d){const nl=Math.max(-1,Math.min(1,lane+d));if(nl!==lane){lane=nl;noise(0.09,0.05,500,1200,1.5);}}
 }
 
@@ -357,6 +382,7 @@ function update(dt){
       if(warn[s]){any=true;sideVal[s]=Math.random()<0.45?0.04:(Math.random()<0.5?1:0.65);if(sideVal[s]>0.6)lit=true;}
       else sideVal[s]=0.5;
     }
+    if(musicG)musicG.gain.setTargetAtTime(MUSIC_VOLUME*(any?0.8:1),ac.currentTime,0.15);
     if(buzzG)buzzG.gain.setTargetAtTime(any?(lit?0.06:0.004):0,ac.currentTime,0.004);
     if(any&&lit&&Math.random()<0.4)noise(0.03,0.04,3000,5000,2);
   }
@@ -368,29 +394,34 @@ function update(dt){
   }
   if(state==='title'){v=1.6;dist+=v*dt;pedal+=v*dt;warn=[false,false];return;}
   if(state==='play'){
-    playT+=dt;v=Math.min(MAX_SPEED,START_SPEED+dodged*SPEED_PER_DODGE+playT*SPEED_PER_SEC);
+    playT+=dt;v=START_SPEED+(MAX_SPEED-START_SPEED)*ease();if(hintT>0)hintT-=dt;
     dist+=v*dt;pedal+=v*dt;amb=0.1-0.065*prog();
     riderX+=(lane*LANE-riderX)*Math.min(1,dt*14);
-    if(dist>=nextSpawn){spawn();nextSpawn=dist+Math.max(3,4.5-Math.min(1.5,dodged*0.08))+Math.random()*3.5;}
+    if(dist>=nextSpawn){const r=spawn();nextSpawn=dist+(r||spawnGap());}
     warn=[false,false];
     for(const m of mons){
-      if(m.fake){m.z-=v*dt;if(m.z>LEAP_Z)warn[m.si]=true;continue;}
+      if(m.fake){m.z-=v*dt;if(m.z>m.ldz)warn[m.si]=true;continue;}
       m.z-=v*dt;
-      if(m.z>LAND_Z)warn[m.si]=true;
-      if(!m.leap&&m.z<=LEAP_Z){m.leap=true;m.tl=pickLane(m);noise(0.35,0.07,700,2600,4);}
-      if(m.leap){const p=Math.max(0,Math.min(1,(LEAP_Z-m.z)/(LEAP_Z-LAND_Z))),e=p*p*(3-2*p);m.x=m.x0+(m.tl*LANE-m.x0)*e;m.hop=Math.sin(Math.PI*p)*26;
+      if(m.z>m.ldz)warn[m.si]=true;
+      if(!m.leap&&m.z<=m.lz){m.leap=true;m.tl=pickLane(m);noise(0.35,0.07,700,2600,4);}
+      if(m.leap){const p=Math.max(0,Math.min(1,(m.lz-m.z)/(m.lz-m.ldz))),e=p*p*(3-2*p);m.x=m.x0+(m.tl*LANE-m.x0)*e;m.hop=Math.sin(Math.PI*p)*26;
         if(!m.landed&&p>=1){m.landed=true;beep(90,0.1,'square',0.05,50);}}
       if(m.z<1.1&&m.z>0.86&&Math.abs(m.x-riderX)<19){die(m);return;}
-      if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;}
+      if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;if(!sessionDodged){sessionDodged=true;hintT=3;}}
     }
-    mons=mons.filter(m=>m.fake?m.z>LEAP_Z:m.z>0.55);
-    if(homeZ()<=2.6)win();
+    mons=mons.filter(m=>m.fake?m.z>m.ldz:m.z>0.55);
+    if(homeZ()<=6)win();
     return;
   }
   if(state==='home'){
-    homeT+=dt;warn=[false,false];amb=0.035;
-    v=Math.max(0,v-dt*3.2);if(homeZ()-v*dt<1.5)v=0;
+    homeT+=dt;warn=[false,false];
+    const left=homeZ()-1.5;v=left>0.02?Math.min(v,left*1.6):0;   // roll gently to a stop at the house
     dist+=v*dt;pedal+=v*dt;riderX+=(0-riderX)*Math.min(1,dt*4);
+    headOn=homeT>E_OFF?0:1;
+    if(homeT>E_LAMPS)sideVal=[0,0];
+    porchLv=homeT>E_PORCH?0:1;winLv=homeT>E_WIN?0:1;
+    doorOpen=homeT>E_DOOR-0.25&&homeT<E_SHUT?1:0;
+    amb=homeT>E_DARK?0:0.035;
     return;
   }
   /* dying: it reaches him, blackout, boy gone, bike tips over, lights go out, the end */
@@ -425,7 +456,7 @@ function drawRoad(){
     const wz=z+dist,k=Math.round(wz/LAMP_D),dz=(wz-k*LAMP_D)/0.55;
     let pool=1-dz*dz;if(k*LAMP_D-dist>outZ||k*LAMP_D-dist>hzv)pool=0;
     const l0=pool>0?lampLevel(k,0):0,l1=pool>0?lampLevel(k,1):0;
-    let porch=0;if(hzv<18){const dh=(z-hzv)/1.6;porch=Math.max(0,1-dh*dh)*0.45;}
+    let porch=0;if(hzv<18){const dh=(z-hzv)/1.6;porch=Math.max(0,1-dh*dh)*0.45*porchLv;}
     const dash=(wz%DASH)<DASH*0.5,hz=z-1.02;
     let f=0,spread=1;
     if(hz>0&&hz<5.5){f=Math.min(1,hz/0.3)*(1-hz/5.5)*headOn;spread=12+hz*24;}
@@ -504,23 +535,92 @@ function drawHome(){
   if(state==='title'||hz>=40){   // mom's porch light, waiting at the end of the road
     if(amb<=0&&state==='dying')return;
     const a=state==='title'?0.55:0.5+0.5*p;
-    ctx.fillStyle='#ffc46e';ctx.globalAlpha=a*0.12;ctx.fillRect(CX-3,HZ-4,7,7);ctx.globalAlpha=a*0.25;ctx.fillRect(CX-1,HZ-2,3,3);ctx.globalAlpha=a;ctx.fillRect(CX,HZ-1,1,1);ctx.globalAlpha=1;return;
+    const g=3+Math.round(4*p);ctx.fillStyle='#ffc46e';ctx.globalAlpha=a*0.12;ctx.fillRect(CX-g,HZ-1-g,g*2+1,g*2+1);ctx.globalAlpha=a*0.25;ctx.fillRect(CX-1,HZ-2,3,3);ctx.globalAlpha=a;ctx.fillRect(CX,HZ-1,1,1);ctx.globalAlpha=1;return;
   }
   if(state==='dying'&&dieT>T_HOFF)return;
+  if(state==='home'&&homeT>E_DARK)return;
   const s=2.6/hz,w=Math.max(2,Math.round(36*s)),h=Math.max(2,Math.round(28*s)),x=Math.round(CX-w/2),y=Math.round(HZ+K/hz-h);
   const glow=Math.min(1,0.55+(40-hz)/30);
-  ctx.globalAlpha=glow;ctx.drawImage(house,x,y,w,h);ctx.globalAlpha=1;
+  ctx.globalAlpha=glow;ctx.drawImage(house,x,y,w,h);
+  if(state==='home'){
+    const px=(sx,sy,sw,sh,col,al)=>{ctx.globalAlpha=al;ctx.fillStyle=col;ctx.fillRect(Math.round(x+sx*w/36),Math.round(y+sy*h/28),Math.max(1,Math.round(sw*w/36)),Math.max(1,Math.round(sh*h/28)));};
+    if(winLv<1){px(6,15,7,6,'#1a1620',glow);px(23,15,7,6,'#1a1620',glow);}
+    if(porchLv<1)px(22,17,2,2,'#38323f',glow);
+    if(doorOpen)px(16,18,5,10,'#ffcf86',glow);
+  }
+  ctx.globalAlpha=1;
+}
+/* eyes in the trees once he is inside */
+const EYES=[[-RW-40,3.4,0],[RW+52,4.6,0.7],[-RW-34,6.2,1.3]];
+function drawEyes(){
+  if(state!=='home'||homeT<E_EYES||homeT>E_DARK+0.6)return;
+  for(const [wx,z,d] of EYES){
+    const t=homeT-E_EYES-d;if(t<0)continue;
+    if(((t*2.7+d*5)%4)<0.18)continue;   // blink
+    const s=1/z,ex=CX+wx*s,ey=HZ+K*s-48*s,sz=Math.max(2,Math.round(5*s)),gap=Math.max(4,Math.round(12*s));
+    ctx.globalAlpha=Math.min(1,t/0.6)*(homeT>E_DARK?Math.max(0,1-(homeT-E_DARK)/0.6):1);ctx.fillStyle='#e8e0c8';
+    ctx.fillRect(Math.round(ex-gap/2-sz/2),Math.round(ey),sz,sz);ctx.fillRect(Math.round(ex+gap/2-sz/2),Math.round(ey),sz,sz);
+  }
+  ctx.globalAlpha=1;
+}
+/* the boy hops off, the bike tips over, he walks in and shuts the door */
+function drawEnding(){
+  const x=Math.round(CX+riderX-10),top=YR-RH;
+  if(homeT<E_IN){
+    const t=Math.max(0,Math.min(1,(homeT-E_WALK)/(E_DOOR-E_WALK))),z=1+(homeZ()-0.03-1)*t,wx=(riderX+12)*(1-t),sc=1/z;
+    const walking=homeT>E_WALK&&homeT<E_DOOR,fr=walking&&(Math.floor(homeT*6)&1)?boyB:boyA;
+    const bw=Math.max(1,Math.round(20*sc)),bh=Math.max(1,Math.round(BH*sc)),bx=Math.round(CX+wx/z-bw/2),by=Math.round(HZ+K/z-bh);
+    ctx.globalAlpha=homeT>E_DOOR?Math.max(0,1-(homeT-E_DOOR)/(E_IN-E_DOOR)):1;ctx.drawImage(fr,bx,by,bw,bh);ctx.globalAlpha=1;
+  }
+  if(homeT<E_TIP){
+    const p=(homeT-E_OFF)/(E_TIP-E_OFF),ang=-Math.round(p*p*5)/5*1.35;
+    ctx.save();ctx.translate(x+10,YR);ctx.rotate(ang);ctx.drawImage(bikeOnly,-10,-RH);ctx.restore();
+  }else if(homeT<E_DARK){ctx.save();ctx.translate(x+4,YR);ctx.scale(-1,1);ctx.drawImage(fallen,-15,-10);ctx.restore();}
+}
+/* where you got to last time, dropped at the side of the road */
+function drawPack(){
+  if(state!=='play'||!closest||bestTime)return;
+  const z=(startFt+HOME_FT-closest)/FT_PER_UNIT-dist;if(z<0.9||z>16)return;
+  const s=1/z,w=Math.max(1,Math.round(12*s)),x=Math.round(CX+(-RW+12)*s-w/2),y=Math.round(HZ+K*s-w);
+  ctx.globalAlpha=Math.min(1,0.45+1.2/z);ctx.drawImage(pack,x,y,w,w);ctx.globalAlpha=1;
+}
+/* the woods: a treeline on the horizon and trunks along the road */
+const TREE_D=1.9;
+let treeTop=new Int8Array(1);
+function makeTreeline(){
+  treeTop=new Int8Array(W);let sd=11;const r=()=>(sd=(sd*16807)%2147483647)/2147483647;
+  for(let cx=-6;cx<W+6;cx+=3+Math.floor(r()*5)){
+    const h=4+Math.floor(r()*9);
+    for(let i=-h;i<=h;i++){const xx=cx+i;if(xx<0||xx>=W)continue;let hh=h-Math.abs(i)*2;const d=Math.abs(xx-CX);if(d<12)hh=Math.min(hh,d>>2);if(hh>treeTop[xx])treeTop[xx]=hh;}
+  }
+}
+function drawWoods(){
+  if(amb<=0)return;
+  ctx.fillStyle='#020304';
+  for(let x=0;x<W;x++){const h=treeTop[x];if(h>0)ctx.fillRect(x,HZ-h,1,h+1);}
+  const hzv=homeZ(),k0=Math.ceil((dist+0.9)/TREE_D),k1=Math.floor((dist+14)/TREE_D);
+  for(let k=k1;k>=k0;k--){
+    const z=k*TREE_D-dist;if(z>hzv)continue;const s=1/z,by=HZ+K*s;
+    for(let si=0;si<2;si++){
+      let h=Math.sin(k*91.7+si*13.1)*43758.5;h-=Math.floor(h);if(h<0.3)continue;
+      const side=si?1:-1,wx=side*(RW+38+h*60),w=Math.max(1,Math.round((5+h*4)*s)),th=Math.round((150+h*90)*s);
+      const kl=Math.round((z+dist)/LAMP_D),near=Math.abs(z+dist-kl*LAMP_D)<1.6?lampLevel(kl,si):0;
+      const L=Math.min(1,amb*1.4+near*0.35),c=Math.round(10+60*L);
+      ctx.fillStyle='rgb('+c+','+Math.round(c*0.85)+','+Math.round(c*0.7)+')';
+      ctx.fillRect(Math.round(CX+wx*s-w/2),Math.round(by-th),w,th);
+    }
+  }
 }
 function drawMon(m){
   if(m.fake)return;
   let frame=monSpr,glow=monGlow,sx=1,sy=1,a;
   const dying=state==='dying';
   if(dying&&m===killer){frame=monReach;glow=monReachGlow;a=1;sy=1.08;}
-  else if(!m.leap){frame=monShut;glow=null;a=sideVal[m.si]>0.6?0.6:0.06;if(m.z<LEAP_Z+0.7){sy=0.8;sx=1.1;}}
+  else if(!m.leap){frame=monShut;glow=null;a=lampLevel(Math.round((m.z+dist)/LAMP_D),m.si)>0.6?0.6:0.06;if(m.z<m.lz+0.7){sy=0.8;sx=1.1;}}
   else{
     a=Math.max(0.3,Math.min(1,1-(m.z-2.5)/5));
-    if(m.z>LAND_Z){frame=monReach;glow=monReachGlow;sy=1.1;sx=0.95;}
-    else{const q=(LAND_Z-m.z)/0.5;if(q<1){sy=0.78+0.22*q;sx=1.12-0.12*q;}else if(m.z<2.1){frame=monReach;glow=monReachGlow;}}
+    if(m.z>m.ldz){frame=monReach;glow=monReachGlow;sy=1.1;sx=0.95;}
+    else{const q=(m.ldz-m.z)/0.5;if(q<1){sy=0.78+0.22*q;sx=1.12-0.12*q;}else if(m.z<2.1){frame=monReach;glow=monReachGlow;}}
     if(dying)a=0.3;
   }
   const s=MSC/m.z,w=Math.max(2,Math.round(MW*s*sx)),h=Math.max(3,Math.round(MH*s*sy));
@@ -570,46 +670,57 @@ function render(){
   const starA=state==='title'?0.45:0.45+0.55*Math.min(1,prog()/0.65);
   if(amb>0)for(const s of stars){ctx.globalAlpha=s[2]*starA;ctx.fillStyle='#8890a8';ctx.fillRect(s[0],s[1],1,1);}
   ctx.globalAlpha=1;
+  drawWoods();
   drawLamps();
   drawHome();
+  drawEyes();
+  drawPack();
+  if(state==='play')for(const m of mons)if(!m.fake&&m.leap&&!m.landed){   // shadow where it will land
+    const q=Math.max(0,Math.min(1,(m.lz-m.z)/(m.lz-m.ldz))),zz=m.z,w=Math.max(3,Math.round((16+10*q)*2/zz)),h=Math.max(1,Math.round(w*0.22));
+    const x=Math.round(CX+m.tl*LANE/zz-w/2),y=Math.round(HZ+K/zz-h/2);
+    ctx.globalAlpha=0.35+0.45*q;ctx.fillStyle='#000';ctx.fillRect(x+1,y,w-2,h);if(h>2)ctx.fillRect(x,y+1,w,h-2);
+  }
+  ctx.globalAlpha=1;
   const grab=state==='dying'&&dieT<T_GRAB;
   if(grab){ctx.save();ctx.translate(Math.round(Math.random()*2-1),Math.round(Math.random()*2-1));}
   const ms=mons.slice().sort((a,b)=>b.z-a.z);
   for(const m of ms)if(m.z>=1)drawMon(m);
-  drawRider();
+  if(state==='home'&&homeT>E_OFF)drawEnding();else drawRider();
   for(const m of ms)if(m.z<1)drawMon(m);
   if(grab)ctx.restore();
 
-  const ink='#d8d0c0',red='#cf2a1f',blink=Math.floor(performance.now()/500)&1;
+  const ink='#d8d0c0',red='#cf2a1f',blink=Math.floor(performance.now()/500)&1,narrow=W<=200,big=narrow?2:1;
   if(state==='title'){
-    const ty=Math.round(HZ*0.22);
+    const ty=Math.round(HZ*0.22),o=big>1?6:0;
     ctext('HOME BEFORE DARK',ty+2,2,red);
-    if(blink)ctext('TAP OR PRESS A KEY',ty+22,1,ink);
-    ctext('LEFT / RIGHT OR TAP SIDES',ty+32,1,ink,0.55);
-    if(bestTime)ctext('BEST TIME '+fmtTime(bestTime),ty+42,1,ink,0.45);
-    else if(closest)ctext('CLOSEST '+closest+' FT FROM HOME',ty+42,1,ink,0.4);
-    else ctext('HALF A MILE HOME',ty+42,1,ink,0.4);
+    if(blink)ctext('TAP OR PRESS A KEY',ty+22,big,ink);
+    ctext(narrow?'TAP LEFT OR RIGHT':'LEFT / RIGHT OR TAP SIDES',ty+32+o,1,ink,0.75);
+    if(bestTime)ctext('BEST TIME '+fmtTime(bestTime),ty+42+o,1,ink,0.7);
+    else if(closest)ctext('CLOSEST '+closest+' FT FROM HOME',ty+42+o,1,ink,0.7);
+    else ctext('HALF A MILE HOME',ty+42+o,1,ink,0.7);
+    if(!narrow)ctext('P PAUSE   M MUTE',H-9,1,ink,0.35);
   }else if(state==='play'){
     text('HOME '+Math.max(0,Math.ceil(HOME_FT-rodeFt()))+' FT',4,4,1,ink,0.8);
     if(playT<2.5&&!paused)ctext('WATCH THE LIGHTS',HZ-14,1,ink,Math.min(1,(2.5-playT)));
+    else if(hintT>0&&!paused)ctext('IT COMES FROM THE FLICKERING SIDE',HZ-14,1,ink,Math.min(1,hintT));
   }else if(state==='home'){
-    const ey=Math.round(H*0.1),gold='#ffc46e';
-    if(homeT>T_HOME_TEXT)ctext('YOU MADE IT HOME',ey,2,gold,Math.min(1,(homeT-T_HOME_TEXT)/0.8));
-    if(homeT>T_HOME_TIME){
-      ctext('TIME '+fmtTime(winTime)+(newRecord?'  NEW BEST':''),ey+22,1,ink,0.85);
-      if(!newRecord)ctext('BEST '+fmtTime(bestTime),ey+32,1,ink,0.45);
+    const ey=Math.round(H*0.4),gold='#ffc46e';
+    if(homeT>E_THEEND)ctext('THE END',ey,3,red,Math.min(1,(homeT-E_THEEND)/0.8));
+    if(homeT>E_TIME){
+      ctext('YOU MADE IT HOME',ey+24,1,gold,0.9);
+      ctext('TIME '+fmtTime(winTime)+(newRecord?'  NEW BEST':''),ey+34,1,ink,0.75);
+      if(!newRecord)ctext('BEST '+fmtTime(bestTime),ey+44,1,ink,0.6);
     }
-    if(homeT>T_HOME_AGAIN&&blink)ctext('TAP TO RIDE AGAIN',ey+48,1,ink,0.8);
+    if(homeT>E_AGAIN&&blink)ctext('TAP TO RIDE AGAIN',ey+58,big,ink,0.85);
   }else{
-    const ey=Math.round(H*0.4);
-    if(dieT>T_END)ctext('THE END',ey,3,red,Math.min(1,(dieT-T_END)/0.8));
-    if(dieT>T_AGAIN){
-      ctext(finalFt+' FT FROM HOME',ey+24,1,ink,0.8);
-      ctext(newBest?'CLOSEST YET':(bestTime?'BEST TIME '+fmtTime(bestTime):'CLOSEST '+closest+' FT'),ey+34,1,ink,0.45);
-      if(blink)ctext('TAP TO RIDE AGAIN',ey+50,1,ink,0.8);
+    const ey=Math.round(H*0.4),quick=crashes>1,tH=quick?1:T_END,tL=quick?T_QUICK:T_AGAIN;
+    if(dieT>tH)ctext(finalFt+' FT FROM HOME',ey,2,red,Math.min(1,(dieT-tH)/0.6));
+    if(dieT>tL){
+      ctext(newBest?'CLOSEST YET':(bestTime?'BEST TIME '+fmtTime(bestTime):'CLOSEST '+closest+' FT'),ey+22,1,ink,0.7);
+      if(blink)ctext('TAP TO RIDE AGAIN',ey+36,big,ink,0.85);
     }
   }
-  if(state==='play'){ctx.globalAlpha=0.6;ctx.fillStyle=ink;ctx.fillRect(W-30,5,2,7);ctx.fillRect(W-26,5,2,7);ctx.globalAlpha=1;}
+  if(state==='play'){ctx.globalAlpha=0.6;ctx.fillStyle=ink;ctx.fillRect(W-33,5,2,7);ctx.fillRect(W-29,5,2,7);ctx.globalAlpha=1;}
   if(paused){
     ctx.globalAlpha=0.65;ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
     const py=Math.round(H*0.3);
@@ -634,25 +745,15 @@ let pDown=null;
 stage.addEventListener('pointerdown',e=>{
   e.preventDefault();cv.focus();
   const r=cv.getBoundingClientRect(),gx=(e.clientX-r.left)/r.width*W,gy=(e.clientY-r.top)/r.height*H;
-  if(gx>W-26&&gx<=W&&gy>=0&&gy<22){audio();setMute(!muted);pDown=null;return;}
-  if(state==='play'&&!paused&&gx>W-46&&gx<=W-26&&gy>=0&&gy<22){setPaused(true);pDown=null;return;}
+  if(gx>W-21&&gx<=W&&gy>=0&&gy<22){audio();setMute(!muted);pDown=null;return;}
+  if(state==='play'&&!paused&&gx>W-44&&gx<=W-21&&gy>=0&&gy<22){setPaused(true);pDown=null;return;}
   if(paused){
     const py=Math.round(H*0.3);
     if(Math.abs(gx-CX)<44&&gy>=py+22&&gy<py+39)setPaused(false);
     else if(Math.abs(gx-CX)<44&&gy>=py+39&&gy<py+58)quit();
     pDown=null;return;
   }
-  pDown={x:e.clientX,done:false};
-});
-stage.addEventListener('pointermove',e=>{
-  if(!pDown||pDown.done)return;
-  const dx=e.clientX-pDown.x;
-  if(Math.abs(dx)>22){pDown.done=true;steer(dx<0?-1:1);}   // swipe
-});
-addEventListener('pointerup',e=>{
-  if(!pDown)return;
-  if(!pDown.done){const r=stage.getBoundingClientRect();steer(e.clientX<r.left+r.width/2?-1:1);}   // tap a side
-  pDown=null;
+  pDown=null;steer(gx<W/2?-1:1);   // steer the moment a finger touches a side
 });
 addEventListener('pointercancel',()=>{pDown=null;});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true);});
@@ -670,7 +771,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__nr={get state(){return state;},get dieT(){return dieT;},get mons(){return mons;},get lane(){return lane;},get paused(){return paused;},warp(ft){startFt-=ft;}};
+window.__nr={get state(){return state;},get dieT(){return dieT;},get mons(){return mons;},get lane(){return lane;},get paused(){return paused;},warp(ft){startFt-=ft;},clear(){mons=[];},remain(ft){startFt=dist*FT_PER_UNIT+ft-HOME_FT;mons=[];}};
 })();
 </script>
 </body>
