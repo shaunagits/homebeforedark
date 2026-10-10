@@ -1,17 +1,18 @@
 # Project status
 
-Last updated 2026-10-10 (harder start, set pieces, pedal harder). Live at https://games.shauna.digital/homebefored## Current state
+Last updated 2026-10-10 (harder again, score replaces best time). Live at https://games.shauna.digital/homebefored## Current state
 
-- One road home, half a mile (`HOME_FT=2640`), about 55 seconds without pedaling harder (43 if you pedal harder the whole way). Countdown in the corner.
-- Harder from the first second: faster start, steady ramp, first creature about a second in, tighter spacing, pairs from 5% of the ride, triples in the last third, feints that switch sides.
+- One road home, half a mile (`HOME_FT=2640`), about 50 seconds without pedaling harder (40 if you pedal harder the whole way). Countdown in the corner.
+- Harder from the first second: faster start, steady ramp, first creature about a second in, tighter spacing, pairs from 5% of the ride, triples from halfway, feints that switch sides. Tuned harder a second time the same day.
 - Set pieces in order: breather, farmhouse lights spelling R U N, scripted left/right/left, the flip side (52% to 65%), breather, three chimes and late leaps (70%), chaser from 72% to the house.
 - New hazards and mechanics: roots in one lane (cracks first), pedal harder (Up / W / swipe up), something behind you that dims the headlight while you coast, close-call slow motion.
 - Dusk to dark over the ride; streetlights die more often near home; dead lights sputter only when something is coming.
 - Landing shadow, treeline and roadside trunks, porch light that grows, backpack marker at your closest finish.
-- Crash: headline "N FT FROM HOME", restart from the beginning; quick retry after the first crash of a visit.
+- Score replaces best time: dodges, close calls (double while pedaling harder) and a bonus for making it home. Best score is saved.
+- Crash: headline "N FT FROM HOME", score and closest finish, restart from the beginning; quick retry after the first crash of a visit.
 - Ending: dismount, bike tips over, he walks in, door shuts, eyes in the trees, streetlights, porch light and windows go out, screen goes dark, "THE END".
 - Music only (built-in synth); it muffles slightly during a flicker and drops on the flip side. Clock chime on its own quiet channel. Other sound effects off (`SFX_VOLUME=0`).
-- Verified 2026-10-10 locally with bots (see `_docs/findings/2026-10-10-harder-ride-bot-check.md`), screenshots at desktop and 390x844, a root crash and a full ending with no page errors. Not yet pushed or checked on the live site.
+- Verified 2026-10-10 locally with bots (see `_docs/findings/2026-10-10-harder-ride-bot-check.md`), screenshots at desktop and 390x844, a root crash and a full ending with no page errors. The first round is live (pushed 2026-10-10); the second round is not yet pushed.
 
  layout checked at 390x844.
 
@@ -36,4 +37,5 @@ Last updated 2026-10-10 (harder start, set pieces, pedal harder). Live at https:
 | New mechanics | Pedal harder (Up / swipe up), close-call slow motion, something behind you, roots on the road | Shauna picked these from the ideas list. The chaser dims the headlight but cannot crash you | 2026-10-10 |
 | Show-inspired nods | Farmhouse lights spelling R U N, the flip side, a clock that chimes at the flip side and when late leaps start | Shauna's picks. Kept generic: no show, town or character names, no brands, no quotes, no theme music | 2026-10-10 |
 | Creature resemblance | Not an issue at this resolution | Shauna: barely visible, and all monsters look the same at this size. Supersedes the flag in the creature design row | 2026-10-10 |
-
+| Difficulty, second pass | Faster (4.8 to 8.0), tighter spacing, more pairs, triples from halfway, more roots and feints earlier, later late leaps, shorter breathers | Shauna: still needs to be harder after playing the first round | 2026-10-10 |
+| Best time | Replaced by a score | Shauna: the ride takes the same time for every player, so time did not show skill. Supersedes "ride again for a better time" in the ending row | 2026-10-10 |

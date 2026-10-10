@@ -19,3 +19,16 @@
 - Slow bots are now caught as early as 16 seconds in, where before the first half was safe.
 - The farmhouse left, right, left was a wall at first (every slow bot caught at the same spot). It now uses pairs spaced 20% wider (`triple(0,1.2)`), and deaths spread out.
 - New hooks: `__nr.riderX`, `v`, `boost`, `chase`, `flip`, `prog`, `warn`, `nearCount`, `farmT`, `playT`, and `sprint(on)`. Roots appear in `__nr.mons` with `root: true` and their lane in `tl`.
+
+## Second pass (harder again)
+
+Same bots after the second round of tuning:
+
+| Bot | First pass | Second pass |
+|---|---|---|
+| lights, 150 ms | 10 of 10 | 8 of 8, about 50 s; pedaling harder the whole way 6 of 6, about 40 s |
+| lights, 250 ms | 4 of 4 | 6 of 6 |
+| react, 300 ms | 4 of 4 | 6 of 6 |
+| react, 400 ms | 4 of 6 | 0 of 6, caught at 34 to 51 s |
+
+Fast, perfect bots still always make it home, so nothing is impossible. Anyone reacting around 0.4 s now gets caught partway through. Scores: about 800 to 950 for a careful fast ride, about 1,200 to 1,700 when pedaling harder and cutting it close.
