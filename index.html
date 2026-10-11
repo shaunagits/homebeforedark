@@ -33,24 +33,25 @@ const RW=80;          // half road width in pixels at the rider
 const LANE=40;        // two lanes: each lane center is this far from the middle of the road
 const LAMP_D=4.5;       // streetlight spacing (world units)
 const DASH=1.2;       // center dash spacing
-const START_SPEED=4.2, MAX_SPEED=7.4;   // speed at the start of the ride and near home (it ramps up steadily by distance)
+const START_SPEED=4.8, MAX_SPEED=8.0;   // speed at the start of the ride and near home (it ramps up steadily by distance)
 const SPRINT=1.3;     // holding Up (or swiping up) pedals this much faster: a better time, less time to react
 const SPAWN_Z=11, LEAP_Z=5.6, LAND_Z=3.9;   // monster appears, starts its jump, lands
 const FIRST_IN=3;     // road distance before the first creature (about a second)
-const GAP_START=6, GAP_END=3.4, GAP_RAND=2.5;   // road distance between creatures at the start and near home, plus up to this much random extra
-const LATE_FROM=0.70, LATE_LEAP=0.85;   // from here on creatures jump this much later (a clock chimes when it starts), so reading the lights matters more than reacting
-const PAIR_FROM=0.05, PAIR_MAX=0.55, PAIR_GAP=0.55;   // back-to-back pairs from both sides start after this much of the ride, up to this chance, this many seconds apart (a bit less near the end)
-const TRIPLE_FROM=0.66, TRIPLE_CHANCE=0.35;   // in the last third a pair can become left, right, left
+const GAP_START=5.2, GAP_END=3.1, GAP_RAND=2.0;   // road distance between creatures at the start and near home, plus up to this much random extra
+const LATE_FROM=0.70, LATE_LEAP=1.0;   // from here on creatures jump this much later (a clock chimes when it starts), so reading the lights matters more than reacting
+const PAIR_FROM=0.05, PAIR_MAX=0.7, PAIR_GAP=0.5;   // back-to-back pairs from both sides start after this much of the ride, up to this chance, this many seconds apart (a bit less near the end)
+const TRIPLE_FROM=0.5, TRIPLE_CHANCE=0.45;   // from halfway a pair can become left, right, left
 const FT_PER_UNIT=8;
 const HOME_FT=2640;   // distance home, in feet (half a mile)
 const DEAD_MIN=0.04, DEAD_MAX=0.5;   // chance a streetlight is dead, near the start and near home
 const FAKE_CHANCE=0.2;   // chance a flicker is a false alarm (nothing comes); rises a little closer to home
-const SWITCH_FROM=0.25, SWITCH_CHANCE=0.15;   // a feint: one side flickers briefly, then the other side, and only the second is real
-const ROOT_FROM=0.22, ROOT_CHANCE=0.16;   // roots crack through the road and block one lane (cracks show first)
-const BREATHERS=[[0.40,0.49],[0.655,0.70]];   // quiet stretches (fraction of the ride) where nothing comes
+const SWITCH_FROM=0.15, SWITCH_CHANCE=0.22;   // a feint: one side flickers briefly, then the other side, and only the second is real
+const ROOT_FROM=0.12, ROOT_CHANCE=0.22;   // roots crack through the road and block one lane (cracks show first)
+const BREATHERS=[[0.42,0.49],[0.665,0.70]];   // quiet stretches (fraction of the ride) where nothing comes
 const FARM_AT=0.485;   // the farmhouse whose holiday lights spell R U N, right before a scripted left, right, left
-const FLIP_FROM=0.52, FLIP_TO=0.65, FLIP_GAP=0.8;   // the flip side: cold colors, spores, red lightning, lower music, creatures closer together
+const FLIP_FROM=0.52, FLIP_TO=0.65, FLIP_GAP=0.7;   // the flip side: cold colors, spores, red lightning, lower music, creatures closer together
 const CHASE_FROM=0.72;   // something follows behind from here to the house; pedal harder to keep it back
+const PTS_DODGE=10, PTS_NEAR=50, PTS_HOME=500, PTS_SPRINT=2;   // score: each dodge, each close call, making it home; dodges and close calls count this many times over while pedaling harder
 const NEAR_X=46, NEAR_T=0.3;   // a close call: it passes this close, or you left its lane this recently (seconds)
 const T_QUICK=1.3;   // after the first crash, how soon a tap can skip to a new ride
 
@@ -206,7 +207,7 @@ const fallen=(()=>{
 
 /* ---------- tiny pixel font ---------- */
 const FONT={A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',K:'101101110101101',L:'100100100100111',M:'1000111011101011000110001',N:'10011101101110011001',O:'010101101101010',P:'110101110100100',Q:'010101101110011',R:'110101110101101',S:'011100010001110',T:'111010010010010',U:'101101101101111',V:'101101101101010',W:'1000110001101011101110001',X:'101101010101101',Y:'101101010010010',Z:'111001010100111',
-0:'111101101101111',1:'010110010010111',2:'110001010100111',3:'110001010001110',4:'101101111001001',5:'111100110001110',6:'011100111101111',7:'111001010010010',8:'111101111101111',9:'111101111001110','.':'000000000000010','<':'001010100010001',':':'000010000010000','-':'000000111000000','/':'001001010100100'};
+0:'111101101101111',1:'010110010010111',2:'110001010100111',3:'110001010001110',4:'101101111001001',5:'111100110001110',6:'011100111101111',7:'111001010010010',8:'111101111101111',9:'111101111001110','.':'000000000000010','<':'001010100010001',':':'000010000010000','-':'000000111000000','/':'001001010100100','+':'000010111010000'};
 function text(s,x,y,sc,col,al){
   ctx.globalAlpha=al==null?1:al;ctx.fillStyle=col;
   for(const ch of s){const g=FONT[ch],w=g?g.length/5:3;if(g)for(let i=0;i<g.length;i++)if(g[i]==='1')ctx.fillRect(x+(i%w)*sc,y+((i/w)|0)*sc,sc,sc);x+=(w+1)*sc;}
@@ -307,9 +308,13 @@ let boost=1,sprintKey=false,sprintTouch=false,laneT=9,prevLane=0,slowT=0,shakeT=
 let chase=0,chaseHintT=0,chaseShown=false,farmT=-1,farmDone=false,flip=0,flipIn=false,flipFlash=0,lateOn=false,boltT=0,bolt=0;
 let spores=[],boltX=0;
 const sprinting=()=>sprintKey||sprintTouch;
-let startFt=0,finalFt=0,paused=false,homeT=0,winTime=0,bestTime=0,closest=0,newRecord=false;
+let startFt=0,finalFt=0,paused=false,homeT=0,winTime=0,bestTime=0,closest=0;
+let score=0,bestScore=0,newScoreBest=false,wonOnce=false,popT=0,popTxt='';
 const T_GRAB=0.55,T_DARK=0.85,T_TILT=1.1,T_FELL=1.5,T_OUT=2.3,T_HFLICK=4.1,T_HOFF=4.5,T_END=5.0,T_AGAIN=6.1;
-try{bestTime=+(localStorage.getItem('homebeforedark-time')||0)||0;closest=+(localStorage.getItem('homebeforedark-closest')||0)||0;}catch(e){}
+try{bestTime=+(localStorage.getItem('homebeforedark-time')||0)||0;closest=+(localStorage.getItem('homebeforedark-closest')||0)||0;bestScore=+(localStorage.getItem('homebeforedark-score')||0)||0;wonOnce=bestTime>0||localStorage.getItem('homebeforedark-home')==='1';}catch(e){}
+/* score: the ride takes about the same time for everyone, so skill shows in points instead */
+function addPts(n,label){const k=boost>1.12?PTS_SPRINT:1;score+=n*k;popT=0.7;popTxt='+'+(n*k)+(label?' '+label:'');}
+function saveScore(){newScoreBest=score>bestScore;if(newScoreBest){bestScore=score;try{localStorage.setItem('homebeforedark-score',String(bestScore));}catch(e){}}}
 /* ending timeline (seconds after reaching the house) */
 const E_OFF=2.2,E_TIP=2.7,E_WALK=2.9,E_DOOR=4.6,E_IN=5.0,E_SHUT=5.4,E_EYES=5.9,E_LAMPS=6.8,E_PORCH=7.4,E_WIN=8.0,E_DARK=8.8,E_THEEND=9.3,E_TIME=10.2,E_AGAIN=11.0;
 let porchLv=1,winLv=1,doorOpen=0;
@@ -317,7 +322,6 @@ const riding=()=>state==='play'||state==='dying'||state==='home';
 const rodeFt=()=>dist*FT_PER_UNIT-startFt;
 function prog(){return riding()?Math.max(0,Math.min(1,rodeFt()/HOME_FT)):0;}
 function homeZ(){return riding()?(startFt+HOME_FT)/FT_PER_UNIT-dist:1e9;}
-function fmtTime(t){const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+(s<10?'0':'')+s;}
 /* each streetlight is either working or dead; dead ones get more common the closer you are to home */
 function lampDead(k,si){
   const p=riding()?Math.max(0,Math.min(1,(k*LAMP_D*FT_PER_UNIT-startFt)/HOME_FT)):0;
@@ -330,7 +334,7 @@ function lampLevel(k,si){
 }
 
 function start(){
-  state='play';v=START_SPEED;lane=1;riderX=LANE;mons=[];dodged=0;playT=0;dieT=0;newBest=false;fell=false;killer=null;
+  state='play';v=START_SPEED;lane=1;riderX=LANE;mons=[];dodged=0;score=0;popT=0;newScoreBest=false;playT=0;dieT=0;newBest=false;fell=false;killer=null;
   headOn=1;amb=0.1;outZ=99;nextSpawn=dist+FIRST_IN;homeT=0;rideSpawns=0;hintT=0;porchLv=1;winLv=1;doorOpen=0;
   boost=1;laneT=9;prevLane=lane;slowT=0;shakeT=0;nearT=0;nearCount=0;
   chase=0;chaseHintT=0;farmT=-1;farmDone=false;flip=0;flipIn=false;flipFlash=0;lateOn=false;boltT=1.5;bolt=0;
@@ -385,13 +389,12 @@ const FARM_GO=1.3;   // seconds after the farmhouse comes into sight that the li
 function nearCheck(m){if(Math.abs(m.x-riderX)<NEAR_X||(laneT<NEAR_T&&prevLane===m.tl))closeCall();}
 function die(m){
   state='dying';dieT=0;v=0;lastTick=0;killer=m;fallDir=m.si?-1:1;crashes++;
-  finalFt=Math.max(1,Math.ceil(HOME_FT-rodeFt()));newBest=false;
+  finalFt=Math.max(1,Math.ceil(HOME_FT-rodeFt()));newBest=false;saveScore();
   if(!closest||finalFt<closest){closest=finalFt;newBest=true;try{localStorage.setItem('homebeforedark-closest',String(closest));}catch(e){}}
   noise(0.6,0.16,900,3200,3);beep(70,0.7,'sawtooth',0.14,40);
 }
 function win(){
-  state='home';homeT=0;mons=[];warn=[false,false];lane=0;sprintKey=sprintTouch=false;winTime=playT;newRecord=!bestTime||winTime<bestTime;
-  if(newRecord){bestTime=winTime;try{localStorage.setItem('homebeforedark-time',String(bestTime));}catch(e){}}
+  state='home';homeT=0;mons=[];warn=[false,false];lane=0;sprintKey=sprintTouch=false;winTime=playT;score+=PTS_HOME;saveScore();wonOnce=true;try{localStorage.setItem('homebeforedark-home','1');}catch(e){}
 }
 function setPaused(p){
   if(state!=='play'||p===paused)return;
@@ -419,7 +422,7 @@ function steer(d){
 }
 /* a narrow escape: a moment of slow motion, a jolt and a flash of text */
 function closeCall(){
-  nearCount++;nearT=1.1;shakeT=0.22;
+  nearCount++;nearT=1.1;shakeT=0.22;addPts(PTS_NEAR,'CLOSE');
   if(slowT<=0)slowT=SLOW_T;
 }
 const SLOW_T=0.5;
@@ -474,7 +477,7 @@ function update(dt){
     if(!lateOn&&p>=LATE_FROM){lateOn=true;chime(3);}   // from here they jump later
     /* the farmhouse: once it is in sight its lights spell it out, then left, right, left */
     if(farmT<0&&farmZ()<15)farmT=0;
-    if(farmT>=0){farmT+=dt;if(!farmDone&&farmT>=FARM_GO){farmDone=true;const d=triple(0,1.2);nextSpawn=dist+d+spawnGap();}}
+    if(farmT>=0){farmT+=dt;if(!farmDone&&farmT>=FARM_GO){farmDone=true;const d=triple(0,1.1);nextSpawn=dist+d+spawnGap();}}
     /* something behind you: it creeps closer unless you pedal harder */
     if(p>CHASE_FROM){
       if(!chaseShown){chaseShown=true;chaseHintT=3.2;}
@@ -487,13 +490,13 @@ function update(dt){
     for(const m of mons){
       m.z-=v*dt;
       if(m.fake){if(m.z>m.ldz)warn[m.si]=true;continue;}
-      if(m.root){if(m.z<1.1&&m.z>0.86&&Math.abs(m.x-riderX)<19){die(m);return;}if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;nearCheck(m);}continue;}
+      if(m.root){if(m.z<1.1&&m.z>0.86&&Math.abs(m.x-riderX)<19){die(m);return;}if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;addPts(PTS_DODGE);nearCheck(m);}continue;}
       if(m.z>m.ldz&&m.z<=(m.wz||99))warn[m.si]=true;
       if(!m.leap&&m.z<=m.lz){m.leap=true;m.tl=pickLane(m);noise(0.35,0.07,700,2600,4);}
       if(m.leap){const q=Math.max(0,Math.min(1,(m.lz-m.z)/(m.lz-m.ldz))),e=q*q*(3-2*q);m.x=m.x0+(m.tl*LANE-m.x0)*e;m.hop=Math.sin(Math.PI*q)*26;
         if(!m.landed&&q>=1){m.landed=true;beep(90,0.1,'square',0.05,50);}}
       if(m.z<1.1&&m.z>0.86&&Math.abs(m.x-riderX)<19){die(m);return;}
-      if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;nearCheck(m);if(!sessionDodged){sessionDodged=true;hintT=3;}}
+      if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;addPts(PTS_DODGE);nearCheck(m);if(!sessionDodged){sessionDodged=true;hintT=3;}}
     }
     mons=mons.filter(m=>m.fake?m.z>m.ldz:m.z>0.55);
     if(homeZ()<=6)win();
@@ -780,7 +783,7 @@ function drawEnding(){
 }
 /* where you got to last time, dropped at the side of the road */
 function drawPack(){
-  if(state!=='play'||!closest||bestTime)return;
+  if(state!=='play'||!closest||wonOnce)return;
   const z=(startFt+HOME_FT-closest)/FT_PER_UNIT-dist;if(z<0.9||z>16)return;
   const s=1/z,w=Math.max(1,Math.round(12*s)),x=Math.round(CX+(-RW+12)*s-w/2),y=Math.round(HZ+K*s-w);
   ctx.globalAlpha=Math.min(1,0.45+1.2/z);ctx.drawImage(pack,x,y,w,w);ctx.globalAlpha=1;
@@ -900,12 +903,13 @@ function render(){
     ctext('HOME BEFORE DARK',ty+2,2,red);
     if(blink)ctext('TAP OR PRESS A KEY',ty+22,big,ink);
     ctext(narrow?'TAP LEFT OR RIGHT  SWIPE UP':'LEFT / RIGHT TO SWERVE   UP TO PEDAL HARDER',ty+32+o,1,ink,0.75);
-    if(bestTime)ctext('BEST TIME '+fmtTime(bestTime),ty+42+o,1,ink,0.7);
+    if(bestScore)ctext('BEST SCORE '+bestScore,ty+42+o,1,ink,0.7);
     else if(closest)ctext('CLOSEST '+closest+' FT FROM HOME',ty+42+o,1,ink,0.7);
     else ctext('HALF A MILE HOME',ty+42+o,1,ink,0.7);
     if(!narrow)ctext('P PAUSE   M MUTE   ESC GAMES',H-9,1,ink,0.35);
   }else if(state==='play'){
     text('HOME '+Math.max(0,Math.ceil(HOME_FT-rodeFt()))+' FT',4,4,1,ink,0.8);
+    text('SCORE '+score,4,12,1,ink,0.6);if(popT>0&&!paused)text(popTxt,4,20,1,'#ffc46e',Math.min(1,popT*2));
     if(playT<2.5&&!paused)ctext('WATCH THE LIGHTS',HZ-14,1,ink,Math.min(1,(2.5-playT)));
     else if(chaseHintT>0&&!paused){ctext('SOMETHING IS BEHIND YOU',HZ-18,1,ink,Math.min(1,chaseHintT));ctext(narrow?'SWIPE UP TO PEDAL HARDER':'HOLD UP TO PEDAL HARDER',HZ-8,1,ink,Math.min(1,chaseHintT)*0.8);}
     else if(hintT>0&&!paused)ctext('IT COMES FROM THE FLICKERING SIDE',HZ-14,1,ink,Math.min(1,hintT));
@@ -917,16 +921,17 @@ function render(){
     if(homeT>E_THEEND)ctext('THE END',ey,3,red,Math.min(1,(homeT-E_THEEND)/0.8));
     if(homeT>E_TIME){
       ctext('YOU MADE IT HOME',ey+24,1,gold,0.9);
-      ctext('TIME '+fmtTime(winTime)+(newRecord?'  NEW BEST':''),ey+34,1,ink,0.75);
-      if(!newRecord)ctext('BEST '+fmtTime(bestTime),ey+44,1,ink,0.6);
+      ctext('SCORE '+score+(newScoreBest?'  NEW BEST':''),ey+34,1,ink,0.75);
+      if(!newScoreBest)ctext('BEST '+bestScore,ey+44,1,ink,0.6);
     }
     if(homeT>E_AGAIN&&blink)ctext('TAP TO RIDE AGAIN',ey+58,big,ink,0.85);
   }else{
     const ey=Math.round(H*0.4),quick=crashes>1,tH=quick?1:T_END,tL=quick?T_QUICK:T_AGAIN;
     if(dieT>tH)ctext(finalFt+' FT FROM HOME',ey,2,red,Math.min(1,(dieT-tH)/0.6));
     if(dieT>tL){
-      ctext(newBest?'CLOSEST YET':(bestTime?'BEST TIME '+fmtTime(bestTime):'CLOSEST '+closest+' FT'),ey+22,1,ink,0.7);
-      if(blink)ctext('TAP TO RIDE AGAIN',ey+36,big,ink,0.85);
+      ctext('SCORE '+score+(newScoreBest?'  NEW BEST':'  BEST '+bestScore),ey+22,1,ink,0.75);
+      ctext(newBest?'CLOSEST YET':'CLOSEST '+closest+' FT',ey+32,1,ink,0.55);
+      if(blink)ctext('TAP TO RIDE AGAIN',ey+46,big,ink,0.85);
     }
   }
   if(state==='play'){ctx.globalAlpha=0.6;ctx.fillStyle=ink;ctx.fillRect(W-33,5,2,7);ctx.fillRect(W-29,5,2,7);ctx.globalAlpha=1;}
@@ -1001,7 +1006,7 @@ function frame(now){
     if(slowT>0){slowT-=dt;const q=Math.max(0,slowT)/SLOW_T;ts=q>0.4?0.3:0.3+0.7*(1-q/0.4);}
     if(state!=='play')slowT=0;
     update(dt*ts);updSpores(dt);
-    if(nearT>0)nearT-=dt;if(flipFlash>0)flipFlash-=dt;
+    if(nearT>0)nearT-=dt;if(popT>0)popT-=dt;if(flipFlash>0)flipFlash-=dt;
     if(shakeT>0)shakeT-=dt;
   }
   const sh=shakeT>0&&!paused;cv.style.transform=sh?'translate('+(Math.random()*6-3).toFixed(1)+'px,'+(Math.random()*6-3).toFixed(1)+'px)':'';
@@ -1012,7 +1017,7 @@ requestAnimationFrame(frame);
 /* test hooks for automated playtests (see _docs/findings): read state, skip ahead (warp), clear creatures, or jump to a set distance from home (remain) */
 window.__nr={get state(){return state;},get dieT(){return dieT;},get mons(){return mons;},get lane(){return lane;},get paused(){return paused;},warp(ft){startFt-=ft;},clear(){mons=[];},remain(ft){startFt=dist*FT_PER_UNIT+ft-HOME_FT;mons=[];},
   get riderX(){return riderX;},get v(){return v;},get boost(){return boost;},get chase(){return chase;},get flip(){return flip;},get prog(){return prog();},get warn(){return warn.slice();},
-  get nearCount(){return nearCount;},get farmT(){return farmT;},get playT(){return playT;},sprint(on){sprintKey=!!on;}};
+  get nearCount(){return nearCount;},get score(){return score;},get farmT(){return farmT;},get playT(){return playT;},sprint(on){sprintKey=!!on;}};
 })();
 </script>
 </body>
