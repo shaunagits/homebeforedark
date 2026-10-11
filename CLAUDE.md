@@ -10,3 +10,4 @@ A pixel-art browser game: a boy rides his bike home at night down one road throu
 - The creature design is Shauna's call; do not redraw it without asking (see the decisions table).
 - No em dashes in any text. No AI or assistant credit in code, commits, or docs.
 - Shauna creates new GitHub repositories herself. A session cannot.
+- After copying a file back to Shauna's computer, confirm it landed (checksum or grep) before committing. The computer's shell has no GitHub login, so pushing needs Shauna's Terminal or the repo attached with push access. See `_docs/findings/2026-10-11-copy-back-and-push.md`.
