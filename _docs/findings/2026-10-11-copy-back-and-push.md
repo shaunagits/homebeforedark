@@ -9,3 +9,5 @@
 **Before trusting a copy-back:** compare checksums on both sides (`shasum -a 256 index.html` on the computer, `sha256sum` in the workspace), or grep a value that changed. Check `git diff --stat` shows `index.html` before committing.
 
 **Pushing:** the shell on Shauna's computer has no GitHub login, so `git push` there fails ("could not read Username"). Either Shauna runs `cd ~/Desktop/claudecode/homebeforedark && git push origin main` in Terminal, or the session attaches `shaunagits/homebeforedark` with push access and pushes from a clone. To keep the same commit on both sides, make a bundle on the computer (`git bundle create hbd.bundle origin/main..main`), fetch it into the clone and push, then delete the bundle. Git commits from the session also need delete permission on the folder, or git leaves lock files behind.
+
+**2026-10-15:** attaching the repo with push access was blocked for the session, so Shauna pushed from Terminal. Committing on the computer worked once delete permission was granted for the folder (git lock files). Commit only the files you changed (`git commit -- index.html`) when other changes are already staged.

@@ -1,13 +1,14 @@
 # Project status
 
-Last updated 2026-10-11 (session wrap-up). Live at https://games.shauna.digital/homebeforedark/ (deploys from `main`).
+Last updated 2026-10-15 (session wrap-up). Live at https://games.shauna.digital/homebeforedark/ (deploys from `main`).
 
 ## Current state
 
-- **Deploy state, read first:** the live site runs the first round of 2026-10-10 changes (commit `2e1624c`). The second round (harder tuning and the score) is in `index.html` in the working copy, staged but not committed or pushed. Commit `94c1e64` on `main` only carried its docs, because the game file never reached the computer during that session (see `_docs/findings/2026-10-11-copy-back-and-push.md`). Until the staged change is pushed, the live docs describe a score the live game does not have.
+- **Deploy state:** live and `main` match at commit `bc4853e` (shorter warnings, 2026-10-15). The second difficulty pass and the score went live in `8391f92` on 2026-10-11. Checked 2026-10-15: the live page contains `WARN_START`.
 - One road home, half a mile (`HOME_FT=2640`), about 50 seconds without pedaling harder (40 if you pedal harder the whole way). Distance countdown and score in the top left.
 - Harder from the first second: speed 4.8 rising to 8.0, first creature about a second in, tight spacing, pairs from 5% of the ride, triples from halfway, feints that switch sides, roots from 12%.
 - Set pieces in order: breather, farmhouse lights spelling R U N, scripted left/right/left, the flip side (52% to 65%), breather, three chimes and late leaps (70%), chaser from 72% to the house.
+- Shorter warnings closer to home: the flicker starts about 1.5 s before a creature lands at the start and about 0.7 s near home (`WARN_START`, `WARN_END`, `warnZ()`); pedaling harder cuts it further. False alarms and feints follow the same timing.
 - Mechanics: two lanes; pedal harder (Up / W / swipe up); something behind you that dims the headlight while you coast (it cannot catch you); close-call slow motion; roots in one lane (cracks first).
 - Score: 10 per dodge, 50 per close call, both doubled while pedaling harder, 500 for making it home. Best score is saved per browser and shown on the title, crash and ending screens. It replaced the best time.
 - Dusk to dark over the ride; streetlights die more often near home; dead lights sputter only when something is coming.
@@ -15,6 +16,7 @@ Last updated 2026-10-11 (session wrap-up). Live at https://games.shauna.digital/
 - Crash: headline "N FT FROM HOME", score and closest finish, restart from the beginning; quick retry after the first crash of a visit.
 - Ending: dismount, bike tips over, he walks in, door shuts, eyes in the trees, lights go out, "THE END", score.
 - Music only (built-in synth); it muffles during a flicker and drops on the flip side. Clock chime on its own quiet channel. Other sound effects off (`SFX_VOLUME=0`).
+- Verified 2026-10-15 (shorter warnings): bots on the exact committed file, lights bot at 150 ms 8 of 8 home and at 250 ms 4 of 4, react bot at 300 ms 4 of 4, no page errors; measured warning about 1.37 s early in the ride and 0.63 s near home. See `_docs/findings/2026-10-15-shorter-warnings-bot-check.md`. Shauna has not played it yet.
 - Verified 2026-10-11: bots on the exact staged file (fast lights bot 4 of 4 home, react bot at 0.4 s 0 of 4), and on 2026-10-10 screenshots at desktop and 390x844, a root crash and a full ending with no page errors. See `_docs/findings/2026-10-10-harder-ride-bot-check.md`. Shauna playtested round one and approved it.
 
 ## Decisions
@@ -45,4 +47,7 @@ Last updated 2026-10-11 (session wrap-up). Live at https://games.shauna.digital/
 | Score balance | Keep favoring risk (close calls and pedaling harder can outscore a clean ride) | Shauna: yes for now | 2026-10-10 |
 | Chaser can catch you | Not yet | Shauna: maybe later. It is the biggest difficulty lever left and changes how the ending plays | 2026-10-10 |
 | Arcade-style scoring | Ideas proposed, nothing built | Shauna asked for ideas only; see `_docs/findings/2026-10-11-arcade-scoring-ideas.md` and TODO | 2026-10-11 |
-
+| Repo visibility | Public, with history rewritten first (author Shauna Arnold, noreply email, no AI credit) | Portfolio piece; nothing in it is private. Old commit IDs changed, so any other clone must re-clone | 2026-10-14 |
+| Shorter warnings near home | Built: 1.5 s at the start down to 0.7 s near home, measured at base speed so pedaling harder still cuts it | Shauna picked it from a new ideas list (others listed in TODO, not approved). Ramps with the same curve as speed and spacing | 2026-10-15 |
+| Second difficulty pass and score (row "Difficulty, second pass" and "Best time" above) | Kept as is | Shauna says she did not ask for this round; the 10/10 rows recorded it as her request. On review she chose to keep all of it. Lesson: only build what Shauna asked for or approved, and quote her request when recording it | 2026-10-15 |
+| Pushing from a session | Shauna pushes from Terminal | Attaching the repo with push access was blocked on 2026-10-15, and the computer's shell has no GitHub login | 2026-10-15 |

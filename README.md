@@ -16,6 +16,7 @@ Play it at https://games.shauna.digital/homebeforedark/
 - Mom's porch light glows at the end of the road from the start and grows as you get closer; the house comes into view near the end.
 - The ride starts at dusk and gets darker the closer you get. Streetlights die more often near home (`DEAD_MIN`, `DEAD_MAX`); a dead light only sputters when something is coming.
 - Two lanes, one on each side of the center line (`LANE`). The flicker tells you where: a creature from the left lands in the left lane, one from the right in the right lane.
+- The warning gets shorter closer to home: a light starts flickering about 1.5 seconds before a creature lands at the start of the ride and about 0.7 seconds before near home (`WARN_START`, `WARN_END`). Pedaling harder cuts it further. False alarms and feints use the same timing.
 - Difficulty follows distance and starts from the first second: speed ramps steadily (`START_SPEED`, `MAX_SPEED`), the first creature comes about a second in (`FIRST_IN`) and spacing tightens (`GAP_START`, `GAP_END`, `GAP_RAND`). The first two creatures come one from each side.
 - Pairs from both sides start almost right away (`PAIR_FROM`, `PAIR_MAX`, `PAIR_GAP`): dodge the first into the second's lane and switch back in time. From halfway a pair can become left, right, left (`TRIPLE_FROM`, `TRIPLE_CHANCE`).
 - False alarms (`FAKE_CHANCE`), and feints (`SWITCH_FROM`, `SWITCH_CHANCE`): one side flickers briefly, then the other, and only the second is real.
@@ -36,5 +37,5 @@ Play it at https://games.shauna.digital/homebeforedark/
 - The music is muffled a little while a streetlight flickers.
 - Sound effects (bike wheel whir, streetlight hum, flicker crackle, lane swish, monster leap, crash) are currently switched off so only the music plays. `SFX_VOLUME` at the top of the sound section turns them back on. The clock chime is the one exception: it plays on its own quiet channel (`chime()`), not through the effects.
 - Closest finish (`homebeforedark-closest`), best score (`homebeforedark-score`), whether you have made it home (`homebeforedark-home`; an old best time in `homebeforedark-time` also counts) and the mute setting (`homebeforedark-muted`) are saved in the browser per web address, so anything saved at the `vercel.app` address does not appear on games.shauna.digital.
-- Tuning knobs (distance, speed, spacing, pairs, triples, feints, roots, the farmhouse, the flip side, the chaser, close calls, ending timings) are at the top of the script in `index.html`.
+- Tuning knobs (distance, speed, warning time, spacing, pairs, triples, feints, roots, the farmhouse, the flip side, the chaser, close calls, ending timings) are at the top of the script in `index.html`.
 - Project status, decisions and next steps: `_docs/PROJECT_STATUS.md` and `_docs/TODO.md`.
