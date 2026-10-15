@@ -36,6 +36,7 @@ const DASH=1.2;       // center dash spacing
 const START_SPEED=4.8, MAX_SPEED=8.0;   // speed at the start of the ride and near home (it ramps up steadily by distance)
 const SPRINT=1.3;     // holding Up (or swiping up) pedals this much faster: a better time, less time to react
 const SPAWN_Z=11, LEAP_Z=5.6, LAND_Z=3.9;   // monster appears, starts its jump, lands
+const WARN_START=1.5, WARN_END=0.7;   // seconds a streetlight flickers before a creature lands, at the start and near home (pedaling harder cuts it further)
 const FIRST_IN=3;     // road distance before the first creature (about a second)
 const GAP_START=5.2, GAP_END=3.1, GAP_RAND=2.0;   // road distance between creatures at the start and near home, plus up to this much random extra
 const LATE_FROM=0.70, LATE_LEAP=1.0;   // from here on creatures jump this much later (a clock chimes when it starts), so reading the lights matters more than reacting
@@ -344,7 +345,8 @@ const inFlip=()=>{const p=prog();return state==='play'&&p>FLIP_FROM&&p<FLIP_TO;}
 function spawnGap(){const e=ease();return (GAP_START-(GAP_START-GAP_END)*e+Math.random()*(GAP_RAND-0.7*e))*(inFlip()?FLIP_GAP:1);}
 function leapZ(){return LEAP_Z-(prog()>=LATE_FROM?LATE_LEAP:0.3*LATE_LEAP*ease());}
 const pairGap=()=>v*(PAIR_GAP-0.15*ease())+0.3;   // seconds between two in a row, turned into road distance
-function mk(si,z,lz,ldz){const m={z,lz,ldz,si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:si?1:-1,passed:false};m.x=m.x0;return m;}
+function warnZ(ldz){const base=START_SPEED+(MAX_SPEED-START_SPEED)*ease();return Math.min(SPAWN_Z,ldz+(WARN_START-(WARN_START-WARN_END)*ease())*base);}   // where on the road the flicker starts
+function mk(si,z,lz,ldz){const m={z,lz,ldz,wz:warnZ(ldz),si,x0:(si?1:-1)*(RW+34),x:0,hop:0,leap:false,tl:null,tl0:si?1:-1,passed:false};m.x=m.x0;return m;}
 /* left, right, left: used by the farmhouse and, late in the ride, by pairs */
 function triple(si,slack){
   const lz=leapZ(),ldz=lz-(LEAP_Z-LAND_Z),g=pairGap()*(slack||1);
@@ -370,10 +372,10 @@ function spawn(){
   if(!early&&p>ROOT_FROM&&Math.random()<ROOT_CHANCE){const tl=Math.random()<0.5?-1:1;mons.push({root:true,z:SPAWN_Z+1,si:tl>0?1:0,tl,x:tl*LANE,ldz:0,passed:false});return 0;}
   /* a feint: a short flicker on one side, then the real one comes from the other */
   if(!early&&p>SWITCH_FROM&&!busy[s2]&&Math.random()<SWITCH_CHANCE){
-    mons.push({fake:true,z:SPAWN_Z,si,lz,ldz:SPAWN_Z-2.2});
-    const r=mk(s2,SPAWN_Z+2.2,lz,ldz);r.wz=SPAWN_Z;mons.push(r);return 0;
+    const w=warnZ(ldz);mons.push({fake:true,z:SPAWN_Z,si,lz,ldz:w-2.2,wz:w});
+    const r=mk(s2,SPAWN_Z+2.2,lz,ldz);r.wz=w;mons.push(r);return 0;
   }
-  if(!early&&Math.random()<FAKE_CHANCE+0.1*p){mons.push({fake:true,z:SPAWN_Z,si,lz,ldz});return 0;}   // false alarm
+  if(!early&&Math.random()<FAKE_CHANCE+0.1*p){mons.push({fake:true,z:SPAWN_Z,si,lz,ldz,wz:warnZ(ldz)});return 0;}   // false alarm
   /* two lanes: the flicker side is the lane it lands in */
   mons.push(mk(si,SPAWN_Z,lz,ldz));
   /* a pair: one from each side, one after the other, so you dodge the first into the second's lane and have to switch back in time */
@@ -489,7 +491,7 @@ function update(dt){
     warn=[false,false];
     for(const m of mons){
       m.z-=v*dt;
-      if(m.fake){if(m.z>m.ldz)warn[m.si]=true;continue;}
+      if(m.fake){if(m.z>m.ldz&&m.z<=(m.wz||99))warn[m.si]=true;continue;}
       if(m.root){if(m.z<1.1&&m.z>0.86&&Math.abs(m.x-riderX)<19){die(m);return;}if(!m.passed&&m.z<=0.86){m.passed=true;dodged++;addPts(PTS_DODGE);nearCheck(m);}continue;}
       if(m.z>m.ldz&&m.z<=(m.wz||99))warn[m.si]=true;
       if(!m.leap&&m.z<=m.lz){m.leap=true;m.tl=pickLane(m);noise(0.35,0.07,700,2600,4);}
